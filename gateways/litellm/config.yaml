@@ -1,0 +1,6 @@
+model_list:
+  - model_name: gpt-mock
+    litellm_params:
+      model: openai/gpt-mock
+      api_base: http://mock:9000/v1
+      api_key: sk-mock

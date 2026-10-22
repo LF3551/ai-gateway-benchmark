@@ -1,0 +1,41 @@
+name: benchmark
+
+# Manual full run. GitHub runners have 4 vCPUs shared by the gateway, the mock and the
+# load generator, so use this to check the harness; compare gateways on a dedicated machine.
+on:
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: Rounds per scenario
+        default: "3"
+      duration:
+        description: Seconds per round
+        default: "20"
+      only:
+        description: Comma-separated targets (empty = all)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: docker compose build
+      - name: Run benchmark
+        env:
+          ROUNDS: ${{ inputs.rounds }}
+          DURATION: ${{ inputs.duration }}
+          ONLY: ${{ inputs.only }}
+        run: node scripts/bench.mjs --rounds "$ROUNDS" --duration "$DURATION" ${ONLY:+--only "$ONLY"}
+      - run: node scripts/report.mjs | tee results/latest.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: results/

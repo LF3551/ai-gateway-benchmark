@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Go vet and format
+        run: |
+          go vet ./...
+          test -z "$(gofmt -l .)"
+      - name: Compose file is valid
+        run: docker compose --profile nginx --profile kong --profile portkey --profile litellm --profile tools config -q
+      - name: Build tools image
+        run: docker compose build
+      - name: Start every gateway
+        run: docker compose --profile nginx --profile kong --profile portkey --profile litellm up -d
+      - name: Smoke test (every target answers plain and streaming requests)
+        run: node scripts/smoke.mjs --wait 120
+      - name: Logs on failure
+        if: failure()
+        run: docker compose --profile nginx --profile kong --profile portkey --profile litellm logs --tail 50
+      - name: Stop
+        if: always()
+        run: docker compose --profile nginx --profile kong --profile portkey --profile litellm down

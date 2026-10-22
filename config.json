@@ -1,0 +1,38 @@
+{
+    "rounds": 3,
+    "durationSeconds": 20,
+    "warmupSeconds": 5,
+    "upstream": "Mock OpenAI-compatible server (cmd/mock) that answers instantly: ~1.4 KB JSON reply, or 40 SSE chunks when streaming",
+    "budget": "Each gateway: 2 CPUs, 2 GB RAM, one gateway running at a time. Load generator: 4 CPUs. Mock: 2 CPUs.",
+    "scenarios": [
+        { "name": "chat-100rps", "rate": 100, "stream": false },
+        { "name": "chat-500rps", "rate": 500, "stream": false },
+        { "name": "chat-1000rps", "rate": 1000, "stream": false },
+        { "name": "chat-2000rps", "rate": 2000, "stream": false },
+        { "name": "stream-100rps", "rate": 100, "stream": true },
+        { "name": "stream-500rps", "rate": 500, "stream": true }
+    ],
+    "targets": [
+        { "name": "direct", "url": "http://mock:9000/v1/chat/completions" },
+        { "name": "nginx", "service": "nginx", "url": "http://nginx:8080/v1/chat/completions" },
+        { "name": "kong", "service": "kong", "url": "http://kong:8000/v1/chat/completions" },
+        {
+            "name": "portkey",
+            "service": "portkey",
+            "url": "http://portkey:8787/v1/chat/completions",
+            "headers": ["x-portkey-provider: openai", "x-portkey-custom-host: http://mock:9000/v1"]
+        },
+        {
+            "name": "litellm",
+            "service": "litellm",
+            "url": "http://litellm:4000/v1/chat/completions",
+            "headers": ["Authorization: Bearer sk-8172e78548b6add7b35f401bfcfa93afff0ceb0d0977ec04307ccaa2f4d32a08"]
+        }
+    ],
+    "versions": {
+        "nginx": "nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de",
+        "kong": "kong:3.9@sha256:aa4a4687b1330e427ad0d3b27a0606b833894297c78abf1a212edc9ba73c8620",
+        "portkey": "portkeyai/gateway:1.15.2@sha256:97f094d9c8a764cbfaa2a7138c0017b247ca923bb06db1b4c13b7f8a33b5200d",
+        "litellm": "ghcr.io/berriai/litellm:v1.106.2@sha256:7294b90f868c5c38c99b83021c7ba46f9b439e95f8e32964c925c7d2563a03f7"
+    }
+}

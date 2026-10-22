@@ -1,0 +1,56 @@
+# Every gateway gets the same budget: 2 CPUs and 2 GB, one gateway running at a time.
+name: ai-gateway-bench
+
+x-gateway: &gateway
+  cpus: 2
+  mem_limit: 2g
+  depends_on: [mock]
+
+services:
+  mock:
+    build: .
+    image: ai-gateway-bench-tools
+    command: ["mock", "-addr", "0.0.0.0:9000"]
+    cpus: 2
+
+  load:
+    image: ai-gateway-bench-tools
+    entrypoint: ["load"]
+    cpus: 4
+    profiles: [tools]
+
+  nginx:
+    <<: *gateway
+    image: nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+    volumes: ["./gateways/nginx/nginx.conf:/etc/nginx/nginx.conf:ro"]
+    profiles: [nginx]
+
+  litellm:
+    <<: *gateway
+    # v1.106.2 by digest: the last release before the compromised 1.107.0 (2026-10-21).
+    image: ghcr.io/berriai/litellm:v1.106.2@sha256:7294b90f868c5c38c99b83021c7ba46f9b439e95f8e32964c925c7d2563a03f7
+    # LiteLLM refuses to start without a strong master key. This one only guards a local benchmark.
+    environment:
+      LITELLM_MASTER_KEY: sk-8172e78548b6add7b35f401bfcfa93afff0ceb0d0977ec04307ccaa2f4d32a08
+    volumes: ["./gateways/litellm/config.yaml:/app/config.yaml:ro"]
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "2"]
+    profiles: [litellm]
+
+  portkey:
+    <<: *gateway
+    image: portkeyai/gateway:1.15.2@sha256:97f094d9c8a764cbfaa2a7138c0017b247ca923bb06db1b4c13b7f8a33b5200d
+    profiles: [portkey]
+
+  kong:
+    <<: *gateway
+    # Last open-source Kong image; kong/kong-gateway 3.10+ needs a license, without one it answers 426.
+    image: kong:3.9@sha256:aa4a4687b1330e427ad0d3b27a0606b833894297c78abf1a212edc9ba73c8620
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/kong.yml
+      KONG_NGINX_WORKER_PROCESSES: "2"
+      KONG_PROXY_ACCESS_LOG: "off"
+      KONG_ADMIN_LISTEN: "off"
+      KONG_PROXY_LISTEN: "0.0.0.0:8000"
+    volumes: ["./gateways/kong/kong.yml:/kong/kong.yml:ro"]
+    profiles: [kong]
