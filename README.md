@@ -65,7 +65,19 @@ docker compose --profile nginx --profile kong --profile portkey --profile litell
 
 ## Results
 
-The write-up linked above has the full table and a chart. Your own run prints the same table from `node scripts/report.mjs` and writes `results/summary.json`.
+One run, 2 CPUs and 2 GB per gateway, median of 3 rounds. Added latency is measured at 100 rps against the direct call; "keeps up to" is the highest tested rate with every answer valid and p99 under 100 ms.
+
+| Gateway | Added to chat reply, p50 | Added to first streamed token, p50 | Keeps up to (chat / stream) | Peak CPU / memory |
+|---|---|---|---|---|
+| nginx 1.29 (floor) | +0.31 ms | +0.48 ms | 2,000+ / 500+ rps | 18% / 10 MiB |
+| Kong 3.9, `ai-proxy` | +0.85 ms | +1.07 ms | 2,000+ / 500+ rps | 32% / 300 MiB |
+| Portkey 1.15 | +1.73 ms | +27.9 ms | 2,000+ / 500+ rps | 118% / 80 MiB |
+| LiteLLM 1.106, 2 workers | +3.82 ms | +10.1 ms | ~400 / ~100 rps | 200% / 2 GiB |
+
+- Portkey's extra time on streams is a constant before the first chunk, not buffering: with the mock slowed to 20 ms and 100 ms between chunks (`-chunk-delay`), the whole stream took as long as a direct call.
+- LiteLLM's limits come from a separate step test at 150 to 400 rps. Past them, latency rises to seconds and requests fail (60% valid at 1,000 chat rps). It was CPU-bound, not out of memory: no OOM kill, and 1.5 GiB is its idle footprint with two workers.
+
+The write-up linked above has the chart and the discussion. Your own run prints the same table from `node scripts/report.mjs` and writes `results/summary.json`.
 
 ## Reading the results
 
